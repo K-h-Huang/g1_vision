@@ -50,6 +50,10 @@ Expected startup output includes ONNX input/output signatures, the MuJoCo joint
 order, and:
 
 ```text
+Loaded depth encoder: ...
+  inputs: [('input', [1, 8, 18, 32])]
+Loaded actor: ...
+  inputs: [('input', [1, 896])]
 Policy observation dim before encoder: 5376
 Depth tail dim: 4608
 ```

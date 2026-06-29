@@ -171,9 +171,25 @@ class OrtModule:
         print(f"  inputs: {[(i.name, i.shape) for i in self.inputs]}")
         print(f"  outputs: {[(o.name, o.shape) for o in self.outputs]}")
 
+    def _reshape_input(self, data: np.ndarray) -> np.ndarray:
+        arr = np.asarray(data, dtype=np.float32)
+        shape = self.inputs[0].shape
+        if any(not isinstance(dim, int) or dim <= 0 for dim in shape):
+            return arr
+
+        expected = int(np.prod(shape))
+        if arr.size != expected:
+            raise ValueError(
+                f"{self.label} expects input shape {shape} ({expected} values), "
+                f"got {arr.shape} ({arr.size} values)"
+            )
+        if tuple(arr.shape) != tuple(shape):
+            arr = arr.reshape(shape)
+        return arr
+
     def run_single(self, data: np.ndarray, preferred_name: str = "obs") -> np.ndarray:
         name = self.inputs[0].name
-        feed = {name: data.astype(np.float32)}
+        feed = {name: self._reshape_input(data)}
         out = self.session.run(None, feed)[0]
         return np.asarray(out, dtype=np.float32)
 
