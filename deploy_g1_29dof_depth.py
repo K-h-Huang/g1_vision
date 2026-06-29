@@ -506,9 +506,9 @@ def main() -> None:
     if args.headless:
         step_loop(None)
     else:
-        import mujoco.viewer
+        from mujoco import viewer as mujoco_viewer
 
-        with mujoco.viewer.launch_passive(model, data) as viewer:
+        with mujoco_viewer.launch_passive(model, data) as viewer:
             step_loop(viewer)
 
     cv2.destroyAllWindows()
