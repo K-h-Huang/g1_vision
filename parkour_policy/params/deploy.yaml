@@ -1,0 +1,83 @@
+joint_ids_map: [15, 22, 14, 16, 23, 13, 17, 24, 12, 18, 25, 0, 6, 19, 26, 1, 7, 20,
+  27, 2, 8, 21, 28, 3, 9, 4, 10, 5, 11]
+step_dt: 0.02
+stiffness: [40.2, 99.1, 40.2, 99.1, 28.5, 28.5, 40.2, 99.1, 40.2, 99.1, 28.5, 28.5,
+  40.2, 28.5, 28.5, 14.3, 14.3, 14.3, 14.3, 14.3, 16.8, 16.8, 14.3, 14.3, 14.3, 14.3,
+  14.3, 16.8, 16.8]
+damping: [2.56, 6.31, 2.56, 6.31, 1.81, 1.81, 2.56, 6.31, 2.56, 6.31, 1.81, 1.81,
+  2.56, 1.81, 1.81, 0.907, 0.907, 0.907, 0.907, 0.907, 1.07, 1.07, 0.907, 0.907, 0.907,
+  0.907, 0.907, 1.07, 1.07]
+default_joint_pos: [0.2, 0.2, 0.0, 0.2, -0.2, 0.0, 0.0, 0.0, 0.0, 0.6, 0.6, -0.312,
+  -0.312, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.669, 0.669, -0.363,
+  -0.363, 0.0, 0.0]
+commands:
+  base_velocity:
+    ranges:
+      lin_vel_x: [0.5, 0.5]
+      lin_vel_y: [0.0, 0.0]
+      ang_vel_z: [0.0, 1.0]
+actions:
+  JointPositionAction:
+    clip: null
+    joint_names: [.*]
+    scale: [0.439, 0.439, 0.439, 0.439, 0.439, 0.439, 0.439, 0.439, 0.548, 0.439,
+      0.439, 0.548, 0.548, 0.439, 0.439, 0.351, 0.351, 0.0745, 0.0745, 0.548, 0.548,
+      0.0745, 0.0745, 0.351, 0.351, 0.439, 0.439, 0.439, 0.439]
+    offset: [0.2, 0.2, 0.0, 0.2, -0.2, 0.0, 0.0, 0.0, 0.0, 0.6, 0.6, -0.312, -0.312, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.669, 0.669, -0.363, -0.363, 0.0, 0.0]
+    joint_ids: null
+observations:
+  base_ang_vel:
+    params: {}
+    clip: null
+    scale: [0.25, 0.25, 0.25]
+    history_length: 8
+  projected_gravity:
+    params: {}
+    clip: null
+    scale: [1.0, 1.0, 1.0]
+    history_length: 8
+  velocity_commands:
+    params: {command_name: base_velocity}
+    clip: null
+    scale: [1.0, 1.0, 1.0]
+    history_length: 8
+  joint_pos_rel:
+    params: {}
+    clip: null
+    scale: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    history_length: 8
+  joint_vel_rel:
+    params: {}
+    clip: null
+    scale: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+      0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
+      0.05, 0.05, 0.05, 0.05]
+    history_length: 8
+  last_action:
+    params: {}
+    clip: null
+    scale: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    history_length: 8
+  depth_image:
+    params:
+      data_type: distance_to_image_plane_noised_history
+      sensor_cfg:
+        name: camera
+        joint_names: null
+        joint_ids: !!python/object/apply:builtins.slice [null, null, null]
+        fixed_tendon_names: null
+        fixed_tendon_ids: !!python/object/apply:builtins.slice [null, null, null]
+        body_names: null
+        body_ids: !!python/object/apply:builtins.slice [null, null, null]
+        object_collection_names: null
+        object_collection_ids: !!python/object/apply:builtins.slice [null, null, null]
+        preserve_order: false
+      history_skip_frames: 5
+      num_output_frames: 8
+      delayed_frame_ranges: !!python/tuple [0, 1]
+      debug_vis: false
+    clip: null
+    scale: null
+    history_length: 1
