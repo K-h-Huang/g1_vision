@@ -7,6 +7,10 @@ depth_encoder_onnx_path: "{DEPLOY_DIR}/parkour_policy/exported/0-depth_encoder.o
 simulation_duration: 60.0
 simulation_dt: 0.002
 control_decimation: 10
+warmup_duration: 1.0
+command_ramp_duration: 2.0
+action_smoothing: 0.2
+action_clip: 1.0
 
 # Camera/depth settings from the G1 deployment C++ path:
 # EncoderRunner width=32 height=18 history=8.
@@ -25,14 +29,19 @@ show_depth_window: true
 depth_window_scale: 10
 
 # Fixed command used when no gamepad/keyboard command source is attached.
-cmd_init: [0.5, 0.0, 0.0]
+# The script ramps from zero to this command after warmup_duration.
+cmd_init: [0.3, 0.0, 0.0]
 
 # Start from the policy default joint pose and stand above the ground plane.
-initial_base_pos: [0.0, 0.0, 0.82]
+initial_base_pos: [0.0, 0.0, 0.86]
 initial_base_quat: [1.0, 0.0, 0.0, 0.0]
 
-# Simple terrain geoms injected into the loaded model so the depth camera has
-# visible structure without modifying the original hiking-in-the-wild-sim2sim XML.
+# Use the same procedural obstacle layout as FeapVision_Mujoco_deployment:
+# long stairs up/down, low ramp, rear platforms. Set terrain_mode: simple to use
+# the fallback extra_geoms list below.
+terrain_mode: feapvision
+
+# Fallback simple terrain geoms.
 extra_geoms:
   - name: floor
     type: plane

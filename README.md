@@ -94,6 +94,21 @@ The default configuration is self-contained and uses:
 - `parkour_policy/exported/actor.onnx`
 - `parkour_policy/data/depth_obs.csv`
 
+## Terrain And Startup Stability
+
+The default terrain mode is `terrain_mode: feapvision`, which injects the same
+obstacle layout used by `FeapVision_Mujoco_deployment`: long stairs up/down, a
+low ramp, and rear platforms.
+
+The robot starts on flat ground before the first stair. To avoid falling during
+the first policy frames, the script:
+
+- holds the default pose for `warmup_duration`
+- ramps the velocity command over `command_ramp_duration`
+- clips and smooths policy actions with `action_clip` and `action_smoothing`
+
+These values are configurable in `configs/g1_29dof_depth.yaml`.
+
 ## Notes
 
 - Run commands from this repository directory, not from the parent workspace.

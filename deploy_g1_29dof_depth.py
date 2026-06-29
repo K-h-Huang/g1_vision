@@ -129,8 +129,90 @@ G1_CAMERA_JOINT_SIGNS = np.asarray(
 )
 
 
+G1_SDK_JOINT_NAMES = [
+    "left_hip_pitch_joint",
+    "left_hip_roll_joint",
+    "left_hip_yaw_joint",
+    "left_knee_joint",
+    "left_ankle_pitch_joint",
+    "left_ankle_roll_joint",
+    "right_hip_pitch_joint",
+    "right_hip_roll_joint",
+    "right_hip_yaw_joint",
+    "right_knee_joint",
+    "right_ankle_pitch_joint",
+    "right_ankle_roll_joint",
+    "waist_yaw_joint",
+    "waist_roll_joint",
+    "waist_pitch_joint",
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "left_wrist_roll_joint",
+    "left_wrist_pitch_joint",
+    "left_wrist_yaw_joint",
+    "right_shoulder_pitch_joint",
+    "right_shoulder_roll_joint",
+    "right_shoulder_yaw_joint",
+    "right_elbow_joint",
+    "right_wrist_roll_joint",
+    "right_wrist_pitch_joint",
+    "right_wrist_yaw_joint",
+]
+
+
 def xml_vector(values: list[float]) -> str:
     return " ".join(f"{float(v):.8g}" for v in values)
+
+
+def feapvision_terrain_geoms() -> list[dict[str, Any]]:
+    geoms: list[dict[str, Any]] = [
+        {
+            "name": "floor",
+            "type": "plane",
+            "pos": [0.0, 0.0, 0.0],
+            "size": [0.0, 0.0, 0.05],
+            "rgba": [0.45, 0.45, 0.45, 1.0],
+        }
+    ]
+
+    def box(name: str, x: float, y: float, z: float, sx: float, sy: float, sz: float) -> None:
+        geoms.append(
+            {
+                "name": name,
+                "type": "box",
+                "pos": [x, y, z],
+                "size": [sx, sy, sz],
+                "quat": [1.0, 0.0, 0.0, 0.0],
+                "rgba": [0.58, 0.48, 0.34, 1.0],
+            }
+        )
+
+    # Same obstacle layout as FeapVision_Mujoco_deployment/resources/.../scene_terrain.xml:
+    # wide stairs up/down, a long low ramp, and rear platforms.
+    for i in range(8):
+        h = 0.08 * (i + 1)
+        box(f"feap_stair_up_{i:02d}", 1.165 + 0.33 * i, 0.0, h, 0.165, 1.75, h)
+
+    box("feap_stair_top", 4.14, 0.0, 0.64, 0.5, 1.75, 0.64)
+
+    for i in range(7):
+        h = 0.56 - 0.08 * i
+        box(f"feap_stair_down_{i:02d}", 4.805 + 0.33 * i, 0.0, h, 0.165, 1.75, h)
+
+    ramp_heights = [0.008333333333333333 * (i + 1) for i in range(30)]
+    for i, h in enumerate(ramp_heights):
+        box(f"feap_ramp_up_{i:02d}", 8.05 + 0.1 * i, 0.0, h, 0.05, 2.0, h)
+
+    box("feap_ramp_top", 11.5, 0.0, 0.25, 0.5, 2.0, 0.25)
+
+    for i, h in enumerate(reversed(ramp_heights[:-1])):
+        box(f"feap_ramp_down_{i:02d}", 12.05 + 0.1 * i, 0.0, h, 0.05, 2.0, h)
+
+    box("feap_rear_platform_0", -2.0, 0.0, 0.15, 1.0, 1.75, 0.15)
+    box("feap_rear_platform_1", -4.0, 0.0, 0.15, 0.5, 1.75, 0.15)
+    return geoms
 
 
 def make_scene_xml(robot_xml_path: Path, extra_geoms: list[dict[str, Any]]) -> Path:
@@ -153,12 +235,46 @@ def make_scene_xml(robot_xml_path: Path, extra_geoms: list[dict[str, Any]]) -> P
         elem.set("type", geom["type"])
         elem.set("pos", xml_vector(geom.get("pos", [0, 0, 0])))
         elem.set("size", xml_vector(geom["size"]))
+        if "quat" in geom:
+            elem.set("quat", xml_vector(geom["quat"]))
         if "rgba" in geom:
             elem.set("rgba", xml_vector(geom["rgba"]))
 
     scene_path = Path(tempfile.gettempdir()) / "g1_29dof_depth_scene.xml"
     robot_tree.write(scene_path, encoding="utf-8", xml_declaration=False)
     return scene_path
+
+
+def mujoco_indices_for_policy_order(
+    model: mujoco.MjModel, policy_joint_ids: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str]]:
+    policy_joint_names = [G1_SDK_JOINT_NAMES[int(motor_id)] for motor_id in policy_joint_ids]
+    qpos_indices: list[int] = []
+    qvel_indices: list[int] = []
+    ctrl_indices: list[int] = []
+
+    for joint_name in policy_joint_names:
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        if joint_id < 0:
+            raise RuntimeError(f"Joint not found in MuJoCo model: {joint_name}")
+        qpos_indices.append(int(model.jnt_qposadr[joint_id]))
+        qvel_indices.append(int(model.jnt_dofadr[joint_id]))
+
+        actuator_id = -1
+        for aid in range(model.nu):
+            if int(model.actuator_trnid[aid, 0]) == joint_id:
+                actuator_id = aid
+                break
+        if actuator_id < 0:
+            raise RuntimeError(f"Actuator not found for joint: {joint_name}")
+        ctrl_indices.append(actuator_id)
+
+    return (
+        np.asarray(qpos_indices, dtype=np.int32),
+        np.asarray(qvel_indices, dtype=np.int32),
+        np.asarray(ctrl_indices, dtype=np.int32),
+        policy_joint_names,
+    )
 
 
 class OrtModule:
@@ -408,7 +524,8 @@ def main() -> None:
         cfg["show_depth_window"] = False
 
     deploy_cfg = load_yaml(Path(cfg["deploy_yaml_path"]))
-    extra_geoms = cfg.get("extra_geoms", [])
+    terrain_mode = str(cfg.get("terrain_mode", "feapvision"))
+    extra_geoms = feapvision_terrain_geoms() if terrain_mode == "feapvision" else cfg.get("extra_geoms", [])
     scene_xml_path = make_scene_xml(Path(cfg["robot_xml_path"]), extra_geoms)
 
     model = mujoco.MjModel.from_xml_path(str(scene_xml_path))
@@ -428,16 +545,20 @@ def main() -> None:
     action_scale = np.asarray(deploy_cfg["actions"]["JointPositionAction"]["scale"], dtype=np.float32)
     action_offset = np.asarray(deploy_cfg["actions"]["JointPositionAction"]["offset"], dtype=np.float32)
 
-    qpos_addr = model.jnt_qposadr[1:]
-    qvel_addr = model.jnt_dofadr[1:]
-    if len(qpos_addr) != len(policy_joint_ids):
-        raise RuntimeError(f"Expected 29 actuated joints, got {len(qpos_addr)}")
+    actuated_joint_count = sum(
+        1 for jid in range(model.njnt) if model.jnt_type[jid] != mujoco.mjtJoint.mjJNT_FREE
+    )
+    if actuated_joint_count != len(policy_joint_ids):
+        raise RuntimeError(f"Expected 29 actuated joints, got {actuated_joint_count}")
     if len(G1_CAMERA_JOINT_SIGNS) != len(policy_joint_ids):
         raise RuntimeError("G1 joint sign map length does not match the policy joint count")
+    qpos_policy_idx, qvel_policy_idx, ctrl_policy_idx, policy_joint_names = mujoco_indices_for_policy_order(
+        model, policy_joint_ids
+    )
 
     data.qpos[0:3] = np.asarray(cfg["initial_base_pos"], dtype=np.float32)
     data.qpos[3:7] = np.asarray(cfg["initial_base_quat"], dtype=np.float32)
-    data.qpos[7 + policy_joint_ids] = default_joint_pos * G1_CAMERA_JOINT_SIGNS
+    data.qpos[qpos_policy_idx] = default_joint_pos * G1_CAMERA_JOINT_SIGNS
     data.qvel[:] = 0.0
     mujoco.mj_forward(model, data)
 
@@ -455,12 +576,13 @@ def main() -> None:
     depth_frame, raw_depth = depth_image(renderer, data, depth_camera_id, cfg)
     depth_buffer = make_depth_history_buffer(depth_frame, int(cfg["depth_history"]))
 
-    cmd = np.asarray(cfg["cmd_init"], dtype=np.float32)
+    cmd_target = np.asarray(cfg["cmd_init"], dtype=np.float32)
+    cmd = np.zeros_like(cmd_target)
     action = np.zeros(len(policy_joint_ids), dtype=np.float32)
     target_policy_order = action * action_scale + action_offset
 
-    q_policy = data.qpos[7 + policy_joint_ids].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
-    dq_policy = data.qvel[6 + policy_joint_ids].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
+    q_policy = data.qpos[qpos_policy_idx].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
+    dq_policy = data.qvel[qvel_policy_idx].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
     obs_builder.reset(
         data.qvel[3:6].astype(np.float32),
         projected_gravity(data.qpos[3:7]),
@@ -473,12 +595,18 @@ def main() -> None:
 
     print("MuJoCo joint order:")
     print(joint_name_order(model))
+    print("Policy joint order:")
+    print(policy_joint_names)
     print(f"Policy observation dim before encoder: {obs_builder.full_obs().shape[1]}")
     print(f"Depth tail dim: {depth_dim}")
 
     control_decimation = int(cfg["control_decimation"])
     depth_skip = int(cfg["depth_history_skip_frames"])
     simulation_duration = float(cfg["simulation_duration"])
+    warmup_duration = float(cfg.get("warmup_duration", 1.0))
+    command_ramp_duration = float(cfg.get("command_ramp_duration", 2.0))
+    action_smoothing = float(cfg.get("action_smoothing", 0.2))
+    action_clip = float(cfg.get("action_clip", 1.0))
     show_depth_preview = bool(cfg.get("show_depth_window", True)) and not args.headless
     render_mode = "headless" if args.headless else "viewer"
     print(
@@ -497,12 +625,13 @@ def main() -> None:
             if viewer is not None and not viewer.is_running():
                 break
             step_start = time.time()
+            elapsed = time.time() - t0
 
-            q_policy = data.qpos[7 + policy_joint_ids].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
-            dq_policy = data.qvel[6 + policy_joint_ids].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
+            q_policy = data.qpos[qpos_policy_idx].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
+            dq_policy = data.qvel[qvel_policy_idx].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
             tau_policy = pd_control(target_policy_order, q_policy, stiffness, dq_policy, damping)
             tau_mujoco = np.zeros(model.nu, dtype=np.float32)
-            tau_mujoco[policy_joint_ids] = tau_policy * G1_CAMERA_JOINT_SIGNS
+            tau_mujoco[ctrl_policy_idx] = tau_policy * G1_CAMERA_JOINT_SIGNS
             data.ctrl[:] = tau_mujoco
             mujoco.mj_step(model, data)
             counter += 1
@@ -514,8 +643,21 @@ def main() -> None:
                     if show_depth_preview:
                         show_depth(raw_depth, cfg)
 
-                q_policy = data.qpos[7 + policy_joint_ids].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
-                dq_policy = data.qvel[6 + policy_joint_ids].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
+                if elapsed < warmup_duration:
+                    cmd = np.zeros_like(cmd_target)
+                    action = np.zeros_like(action)
+                    target_policy_order = action_offset.copy()
+                    control_counter += 1
+                    continue
+
+                if command_ramp_duration > 0:
+                    ramp = min((elapsed - warmup_duration) / command_ramp_duration, 1.0)
+                else:
+                    ramp = 1.0
+                cmd = cmd_target * np.clip(ramp, 0.0, 1.0)
+
+                q_policy = data.qpos[qpos_policy_idx].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
+                dq_policy = data.qvel[qvel_policy_idx].astype(np.float32) * G1_CAMERA_JOINT_SIGNS
                 full_obs = obs_builder.add(
                     data.qvel[3:6].astype(np.float32),
                     projected_gravity(data.qpos[3:7]),
@@ -525,7 +667,8 @@ def main() -> None:
                     action,
                     depth_history_vector(depth_buffer),
                 )
-                action = policy.infer(full_obs)
+                raw_action = np.clip(policy.infer(full_obs), -action_clip, action_clip)
+                action = (1.0 - action_smoothing) * action + action_smoothing * raw_action
                 target_policy_order = action * action_scale + action_offset
                 control_counter += 1
 
