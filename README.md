@@ -37,10 +37,27 @@ conda activate g1-vision-mujoco
 pip install -r requirements.txt
 ```
 
-## Quick Verification
+## Run With Rendering
 
-Run this first on a new machine. It loads the MuJoCo model, depth encoder, actor
-ONNX model, and runs a short headless simulation:
+Use this mode on a desktop machine. It opens the MuJoCo viewer and an OpenCV
+window named `g1 depth_cam` for the rendered depth image:
+
+```bash
+python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --duration 60
+```
+
+The depth window is enabled by default through `show_depth_window: true` in
+`configs/g1_29dof_depth.yaml`. Disable only the depth preview with:
+
+```bash
+python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --no-depth-window
+```
+
+## Headless Verification
+
+Use this on a server or SSH session without a display. It loads the MuJoCo
+model, depth encoder, actor ONNX model, and runs a short simulation without
+opening windows:
 
 ```bash
 python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --headless --duration 5
@@ -56,14 +73,6 @@ Loaded actor: ...
   inputs: [('input', [1, 896])]
 Policy observation dim before encoder: 5376
 Depth tail dim: 4608
-```
-
-## Run With Viewer
-
-After the headless check passes:
-
-```bash
-python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml
 ```
 
 Useful options:
@@ -91,5 +100,7 @@ The default configuration is self-contained and uses:
 - On Linux servers without a display, use `--headless`.
 - On Linux, if OpenGL/EGL libraries are missing, install the system MuJoCo
   runtime dependencies for your distribution before running the viewer.
+- In rendering mode, the script should print `Running viewer simulation...` and
+  open both the MuJoCo viewer and `g1 depth_cam`.
 - The policy uses a fixed velocity command from `configs/g1_29dof_depth.yaml`
   unless `--cmd VX VY WZ` is provided.

@@ -374,7 +374,16 @@ def show_depth(raw_depth: np.ndarray, cfg: dict[str, Any]) -> None:
     disp = (disp - float(cfg["depth_min_range"])) / (
         float(cfg["depth_max_range"]) - float(cfg["depth_min_range"])
     )
-    cv2.imshow("g1 depth_cam", disp)
+    disp_u8 = (disp * 255.0).astype(np.uint8)
+    scale = int(cfg.get("depth_window_scale", 10))
+    disp_u8 = cv2.resize(
+        disp_u8,
+        (disp_u8.shape[1] * scale, disp_u8.shape[0] * scale),
+        interpolation=cv2.INTER_NEAREST,
+    )
+    color = cv2.applyColorMap(disp_u8, cv2.COLORMAP_TURBO)
+    cv2.namedWindow("g1 depth_cam", cv2.WINDOW_NORMAL)
+    cv2.imshow("g1 depth_cam", color)
     cv2.waitKey(1)
 
 
@@ -471,6 +480,13 @@ def main() -> None:
     depth_skip = int(cfg["depth_history_skip_frames"])
     simulation_duration = float(cfg["simulation_duration"])
     show_depth_preview = bool(cfg.get("show_depth_window", True)) and not args.headless
+    render_mode = "headless" if args.headless else "viewer"
+    print(
+        f"Running {render_mode} simulation for {simulation_duration:.2f}s "
+        f"(depth window: {'on' if show_depth_preview else 'off'})"
+    )
+    if show_depth_preview:
+        show_depth(raw_depth, cfg)
 
     def step_loop(viewer: Any | None = None) -> None:
         counter = 0
@@ -518,6 +534,7 @@ def main() -> None:
             dt_rem = model.opt.timestep - (time.time() - step_start)
             if dt_rem > 0:
                 time.sleep(dt_rem)
+        print(f"Done. MuJoCo steps: {counter}, policy steps: {control_counter}")
 
     if args.headless:
         step_loop(None)

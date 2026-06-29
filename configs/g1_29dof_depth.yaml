@@ -22,6 +22,7 @@ depth_max_range: 2.0
 depth_noise_amp: 0.0
 depth_vis_rotate_k: 0
 show_depth_window: true
+depth_window_scale: 10
 
 # Fixed command used when no gamepad/keyboard command source is attached.
 cmd_init: [0.5, 0.0, 0.0]
