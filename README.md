@@ -1,4 +1,4 @@
-# G1 29DoF depth MuJoCo deployment test
+# G1 29DoF Depth MuJoCo Deployment Test
 
 This folder is a standalone Python MuJoCo test harness for the G1 29DoF parkour
 policy. The robot XML/meshes and policy files are copied into this folder, so it
@@ -15,33 +15,64 @@ It follows the deployment flow used by `FeapVision_Mujoco_deployment`:
 6. replace the raw depth tail of the observation with the encoder latent,
 7. run `actor.onnx` and apply the joint-position action.
 
-## Requirements
+## Conda Environment
 
-Install the runtime packages in the Python environment you use for MuJoCo:
+Create the environment from the repository root:
 
 ```bash
-pip install mujoco onnxruntime opencv-python pyyaml numpy
+conda env create -f environment.yml
 ```
 
-## Run
-
-From the workspace root:
+Activate it:
 
 ```bash
-python g1_29dof_depth_mujoco_deployment/deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml
+conda activate g1-vision-mujoco
+```
+
+If you prefer to create the environment manually:
+
+```bash
+conda create -n g1-vision-mujoco python=3.10 pip -y
+conda activate g1-vision-mujoco
+pip install -r requirements.txt
+```
+
+## Quick Verification
+
+Run this first on a new machine. It loads the MuJoCo model, depth encoder, actor
+ONNX model, and runs a short headless simulation:
+
+```bash
+python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --headless --duration 5
+```
+
+Expected startup output includes ONNX input/output signatures, the MuJoCo joint
+order, and:
+
+```text
+Policy observation dim before encoder: 5376
+Depth tail dim: 4608
+```
+
+## Run With Viewer
+
+After the headless check passes:
+
+```bash
+python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml
 ```
 
 Useful options:
 
 ```bash
-python g1_29dof_depth_mujoco_deployment/deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --headless --duration 5
-python g1_29dof_depth_mujoco_deployment/deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --cmd 0.5 0.0 0.0
+python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --headless --duration 5
+python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --cmd 0.5 0.0 0.0
+python deploy_g1_29dof_depth.py configs/g1_29dof_depth.yaml --no-depth-window
 ```
 
-Use `--headless --duration 5` first to verify ONNX signatures and observation
-dimensions before opening the MuJoCo viewer.
+## Repository Layout
 
-The default configuration uses:
+The default configuration is self-contained and uses:
 
 - `g1/g1_29dof_with_camera.xml`
 - `g1/meshes/`
@@ -49,3 +80,12 @@ The default configuration uses:
 - `parkour_policy/exported/0-depth_encoder.onnx`
 - `parkour_policy/exported/actor.onnx`
 - `parkour_policy/data/depth_obs.csv`
+
+## Notes
+
+- Run commands from this repository directory, not from the parent workspace.
+- On Linux servers without a display, use `--headless`.
+- On Linux, if OpenGL/EGL libraries are missing, install the system MuJoCo
+  runtime dependencies for your distribution before running the viewer.
+- The policy uses a fixed velocity command from `configs/g1_29dof_depth.yaml`
+  unless `--cmd VX VY WZ` is provided.

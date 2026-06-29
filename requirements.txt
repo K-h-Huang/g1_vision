@@ -1,0 +1,6 @@
+numpy
+pyyaml
+mujoco==3.2.7
+onnxruntime==1.20.1
+opencv-python==4.10.0.84
+
